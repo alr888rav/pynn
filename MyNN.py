@@ -53,7 +53,7 @@ class Neural_net:
 class LossAndErrorPrintingCallback(keras.callbacks.Callback):
 
   def on_epoch_end(self, epoch, logs=None):
-    print('Accuracy {} .'.format(float(logs['accuracy'])))
+    print('Accuracy {} '.format(float(logs['accuracy']))+' test accuracy {}'.format(float(logs['val_accuracy'])))
 
 class EarlyStoppingAtMinLoss(keras.callbacks.Callback):
   """Stop training when the loss is at its min, i.e. the loss stops decreasing.
