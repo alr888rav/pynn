@@ -1,8 +1,8 @@
 import PySimpleGUI as sg
 import MyData as md
 import MyNN as my_nn
-import datetime
 import matplotlib.pyplot as plt
+import matplotlib.ticker as ticker
 import matplotlib
 from matplotlib.backends.backend_tkagg import FigureCanvasTkAgg
 from matplotlib.figure import Figure
@@ -15,10 +15,10 @@ neurons = ['1024', '512', '256', '128', '64', '32', '16', '10']
 input_layout = [[sg.Text('Input size', size=(10, 1)), sg.Input('28', size=(3, 1), key='INPUT_WIDTH', tooltip='width'),
                  sg.Text('X'),
                  sg.Input('28', size=(3, 1), key='INPUT_HEIGHT', tooltip='height')],
-                [sg.Checkbox('CONV 2D', size=(30,1), key='INPUT_CONV2D', tooltip='64 filters 3x3, polling 2x2')],
+                [sg.Checkbox('CONV 2D', size=(30, 1), key='INPUT_CONV2D', tooltip='64 filters 3x3, polling 2x2', enable_events=True)],
                 [sg.Text('Neurons', size=(10, 1)), sg.Combo(values=neurons, default_value='128', key='INPUT_NEURONS'),
                  sg.Text('Activation'),
-                 sg.Combo(['sigmoid', 'tanh', 'relu'], default_value='sigmoid', key='INPUT_ACTIV')]
+                 sg.Combo(['sigmoid', 'tanh', 'relu'], default_value='sigmoid', key='INPUT_ACTIV', readonly=True)]
                 ]
 
 train_layout = \
@@ -30,11 +30,13 @@ train_layout = \
          sg.Input('2', size=(5, 1), key='EARLY_STOP_VALUE')],
         [sg.Checkbox('Drop out', size=(11, 1), key='DROP_OUT'),
          sg.Input('25', size=(5, 1), key='DROP_OUT_VALUE'), sg.Text('%')],
-        [sg.Button('Train', size=(22, 1), key='TRAIN_BTN')]
+        [sg.Button('Train', size=(10, 1), key='TRAIN_BTN', tooltip='start training'),
+         sg.Button('Show graph', size=(10, 1), key='PLOT_BTN', tooltip='training graph')]
     ])
       ]]
 
-source_layout = [[sg.Radio('MNIST', group_id=2, default=True, key='RADIO_MNIST')
+source_layout = [[sg.Combo(['boston_housing', 'cifar10', 'cifar100', 'mnist', 'fashion_mnist', 'imdb', 'reuters'],
+                           default_value='mnist', key='DATABASE', readonly=True)
                   ]]
 
 data_layout = \
@@ -42,15 +44,14 @@ data_layout = \
         [sg.Radio('Training', group_id=1, key='RADIO_TRAIN'),
          sg.Radio('Testing', group_id=1, default=True, key='RADIO_TEST')],
         [sg.Frame('Source', layout=source_layout)],
-        [sg.Button('Test', size=(20, 1))]])
+        [sg.Button('Show', size=(8, 1), key='SHOW_DB'), sg.Button('Test', size=(8, 1), key='TEST_DB')]])
       ]]
 
 G_SIZE = (400, 250)
 images_layout = \
     [[sg.Frame(title='Graph', layout=[
         [sg.Graph(canvas_size=G_SIZE, graph_bottom_left=(0, 0), graph_top_right=G_SIZE, key='GRAPH',
-                  background_color='white')]])],
-     [sg.Button('Plot graph', key='PLOT_BTN')]
+                  background_color='white')]])]
      ]
 
 hidden_count = [[sg.Text('Count', size=(10, 1)), sg.Spin([1, 2, 3, 4, 5], initial_value=1, key='HID_COUNT',
@@ -58,28 +59,28 @@ hidden_count = [[sg.Text('Count', size=(10, 1)), sg.Spin([1, 2, 3, 4, 5], initia
 
 hidden_layout1 = [[sg.Text('Neurons', size=(10, 1)), sg.Combo(values=neurons, default_value='64', key='HID_NEURONS1'),
                    sg.Text('Activation'),
-                   sg.Combo(['sigmoid', 'tanh', 'relu'], default_value='sigmoid', key='HID_ACTIV1')]]
+                   sg.Combo(['sigmoid', 'tanh', 'relu'], default_value='sigmoid', key='HID_ACTIV1', readonly=True)]]
 
 hidden_layout2 = [[sg.Text('Neurons', size=(10, 1)), sg.Combo(values=neurons, default_value='32', key='HID_NEURONS2'),
                    sg.Text('Activation'),
-                   sg.Combo(['sigmoid', 'tanh', 'relu'], default_value='sigmoid', key='HID_ACTIV2')]]
+                   sg.Combo(['sigmoid', 'tanh', 'relu'], default_value='sigmoid', key='HID_ACTIV2', readonly=True)]]
 
 hidden_layout3 = [[sg.Text('Neurons', size=(10, 1)), sg.Combo(values=neurons, default_value='32', key='HID_NEURONS3'),
                    sg.Text('Activation'),
-                   sg.Combo(['sigmoid', 'tanh', 'relu'], default_value='sigmoid', key='HID_ACTIV3')]]
+                   sg.Combo(['sigmoid', 'tanh', 'relu'], default_value='sigmoid', key='HID_ACTIV3', readonly=True)]]
 
 hidden_layout4 = [[sg.Text('Neurons', size=(10, 1)), sg.Combo(values=neurons, default_value='32', key='HID_NEURONS4'),
                    sg.Text('Activation'),
-                   sg.Combo(['sigmoid', 'tanh', 'relu'], default_value='sigmoid', key='HID_ACTIV4')]]
+                   sg.Combo(['sigmoid', 'tanh', 'relu'], default_value='sigmoid', key='HID_ACTIV4', readonly=True)]]
 
 hidden_layout5 = [[sg.Text('Neurons', size=(10, 1)), sg.Combo(values=neurons, default_value='32', key='HID_NEURONS5'),
                    sg.Text('Activation'),
-                   sg.Combo(['sigmoid', 'tanh', 'relu'], default_value='sigmoid', key='HID_ACTIV5')]]
+                   sg.Combo(['sigmoid', 'tanh', 'relu'], default_value='sigmoid', key='HID_ACTIV5', readonly=True)]]
 
 hidden_layout_out = [[sg.Text('Neurons', size=(10, 1)), sg.Combo(values=neurons, default_value='10',
                                                                  key='HID_NEURONS_OUT'),
                       sg.Text('Activation'),
-                      sg.Combo(['sigmoid', 'softmax'], default_value='softmax', key='HID_ACTIV_OUT')]]
+                      sg.Combo(['sigmoid', 'softmax'], default_value='softmax', key='HID_ACTIV_OUT', readonly=True)]]
 
 config_layout = [[sg.Frame('Input/hidden', layout=input_layout, pad=(0, 4))],
                  [sg.Frame('Hidden layers', layout=hidden_count, key='HC', pad=(0, 4))],
@@ -136,18 +137,55 @@ def plot_draw(epoch=None, logs=None):
         l1, = ax.plot(history.accuracy, color='blue')
         l2, = ax.plot(history.val_accuracy, color='orange')
         ax.legend([l1, l2], ['accuracy', 'validate'])
+        ax.xaxis.set_major_locator(ticker.MaxNLocator(integer=True))  # force int x-axis (after plot)
         fig_agg.draw()
         main_window.Refresh()
+
+
+def plot_db():
+    global main_window, data
+    data = create_data()
+    if data.source in ['mnist', 'fashion_mnist', 'cifar10', 'cifar100']:
+        plt.figure('Database '+data.source, figsize=(5, 5))
+        for i in range(9):
+            plt.subplot(3, 3, i + 1)
+            plt.xticks([])
+            plt.yticks([])
+            plt.grid(False)
+            if bool(main_window['RADIO_TRAIN'].get()):
+                plt.imshow(data.x_train[i])
+                plt.xlabel(data.y_train_label[i])
+            else:
+                plt.imshow(data.x_test[i])
+                plt.xlabel(data.y_test_label[i])
+            if data.class_names is not None:
+                plt.xlabel(data.class_names[int(data.y_test_label[i])])
+        plt.show(block=False)
+
+
+def plot_clear():
+    ax.cla()
+
+
+# prepare draw
+def plot_prepare():
+    global fig, ax, fig_agg
+    if fig is None:
+        fig = Figure(figsize=(5, 4))  # inches
+        ax = fig.add_subplot(111)
+        ax.set_title('model accuracy')
+        ax.set_ylabel('accuracy')
+        ax.set_xlabel('epoch')
+        ax.grid(b=True)
+        canvas = main_window['GRAPH'].TKCanvas
+        fig_agg = draw_figure(canvas, fig)
 
 
 # load data
 def create_data():
     global main_window
-    if bool(main_window['RADIO_MNIST'].get()):
-        src = 1
-    else:
-        src = 0
-    dt = md.Data(src)
+    db = main_window['DATABASE'].get()
+    dt = md.Data(db)
     dt.load()
     return dt
 
@@ -181,7 +219,6 @@ def create_nn():
 # main loop
 def main():
     global main_window, data, nn, fig_agg, ax, fig
-    first = True
     main_window = sg.Window('Simple neural network constructor', main_layout, resizable=True, background_color='gray',
                             button_color=['black', 'white'], icon='logo.ico')
 
@@ -190,7 +227,7 @@ def main():
         event, values = main_window.Read(timeout=1000)
         if event in (None, 'Cancel'):
             break
-        #elif event == '__TIMEOUT__':
+        # elif event == '__TIMEOUT__':
             #    print(datetime.datetime.now())
             #if first:
             #    main_window['H2'].update(visible=False)
@@ -203,7 +240,19 @@ def main():
                 else:
                     main_window['H' + str(i)].update(visible=False)
             main_window.Refresh()
+        elif event == 'INPUT_CONV2D':
+            if bool(main_window['INPUT_CONV2D'].get()):
+                af = 'relu'
+            else:
+                af = 'sigmoid'
+            main_window['INPUT_ACTIV'].update(value=af)
+            for i in range(1, MAX_HIDDEN + 1):
+                main_window['HID_ACTIV' + str(i)].update(values=af)
+        elif event == 'SHOW_DB':
+            plot_db()
         elif event == 'PLOT_BTN':
+            plot_prepare()
+            plot_clear()
             plot_draw()
         elif event == 'CREATE_BTN':
             if data is None:
@@ -213,23 +262,10 @@ def main():
             if data is None:
                 data = create_data()
 
-            # prepare draw
-            if fig is None:
-                fig = Figure(figsize=(5, 4))  # inches
-                ax = fig.add_subplot(111)
-                ax.set_title('model accuracy')
-                plt.legend(['training', 'validation'], loc='best')
-                ax.set_ylabel('accuracy')
-                ax.set_xlabel('epoch')
-                ax.grid(b=True)
-                canvas = main_window['GRAPH'].TKCanvas
-                fig_agg = draw_figure(canvas, fig)
+            plot_prepare()
             # clear before each training
-            ax.cla()
-            # axis on
-            ax.grid(b=True)
+            plot_clear()
 
-            #if nn is None:
             nn = create_nn()
             bs = int(main_window['BATCH_SIZE'].get())
             ep = int(main_window['EPOCH'].get())
@@ -246,7 +282,7 @@ def main():
             if nn.conv:
                 nn.fit(data.x_train2d, data.y_train, data.x_test2d, data.y_test, bs, ep, lr, es, do, plot_draw)
             else:
-                nn.fit(data.x_train, data.y_train, data.x_test, data.y_test, bs, ep, lr, es, do, plot_draw)
+                nn.fit(data.x_train1d, data.y_train, data.x_test1d, data.y_test, bs, ep, lr, es, do, plot_draw)
 
     main_window.Close()
 
