@@ -3,16 +3,20 @@ from keras.layers import Dense, Dropout, Conv2D, MaxPooling2D, Flatten, \
 from keras.models import Sequential # Documentation: https://keras.io/models/sequential/
 from tensorflow import keras
 import numpy as np
+import tensorflow as tf
+import tensorflow_hub as hub
 
 class Neural_net:
     def __init__(self):
         self.model = Sequential()
         self.conv = False
+        self.database = None
 
     def summary(self):
         self.model.summary()
 
-    def add_input(self, neurons, activation_type, input_width, input_height, conv2d):
+    def add_input(self, neurons, activation_type, input_width, input_height, conv2d, database):
+        self.database = database
         if conv2d:
             self.conv = True
             # 32 convolution filters used each of size 3x3
@@ -22,6 +26,8 @@ class Neural_net:
             # flatten since too many dimensions, we only want a classification output
             self.model.add(Flatten())
             self.model.add(Dense(units=neurons, activation=activation_type))
+        elif database in ['imdb', 'reuters']:  # text data
+            self.model.add(Dense(neurons, activation=activation_type, input_shape=(10000,)))
         else:
             self.model.add(Dense(units=neurons, activation=activation_type, input_shape=(input_width * input_height,)))
 
@@ -44,8 +50,11 @@ class Neural_net:
             cb.insert(0, EarlyStoppingAtMinLoss())
 
         sgd = keras.optimizers.SGD(lr=learning_rate)
-
-        self.model.compile(optimizer=sgd, loss='categorical_crossentropy', metrics=['accuracy'])
+        if self.database == 'imdb':
+            ls = 'binary_crossentropy'
+        else:
+            ls = 'categorical_crossentropy'
+        self.model.compile(optimizer=sgd, loss=ls, metrics=['accuracy'])
         self.history = self.model.fit(x_train, y_train, batch_size=batch, epochs=epoch, verbose=False, validation_split=.1, callbacks=cb)
         self.loss, self.accuracy = self.model.evaluate(x_test, y_test, verbose=False)
         print(f'Test accuracy: {self.accuracy:.3}')

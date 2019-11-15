@@ -10,12 +10,14 @@ from matplotlib.figure import Figure
 matplotlib.use('TkAgg')  # draw inside main_window
 
 MAX_HIDDEN = 5
-neurons = ['1024', '512', '256', '128', '64', '32', '16', '10']
+neurons = ['1024', '512', '256', '128', '64', '32', '16', '10', '5', '2', '1']
 
-input_layout = [[sg.Text('Input size', size=(10, 1)), sg.Input('28', size=(3, 1), key='INPUT_WIDTH', tooltip='width'),
+i_layout= [[sg.Text('Input size', size=(10, 1)), sg.Input('28', size=(3, 1), key='INPUT_WIDTH', tooltip='width'),
                  sg.Text('X'),
-                 sg.Input('28', size=(3, 1), key='INPUT_HEIGHT', tooltip='height')],
-                [sg.Checkbox('CONV 2D', size=(30, 1), key='INPUT_CONV2D', tooltip='64 filters 3x3, polling 2x2', enable_events=True)],
+                 sg.Input('28', size=(3, 1), key='INPUT_HEIGHT', tooltip='height')]]
+input_layout = [[sg.Frame('', layout=i_layout, key='INPUT_SIZE')],
+                [sg.Checkbox('CONV 2D', size=(30, 1), key='INPUT_CONV2D', tooltip='64 filters 3x3, polling 2x2', enable_events=True),
+                 sg.Checkbox('Text preprocess', size=(30,1), default=True, disabled=True, key='INPUT_TEXT_PP', tooltip='text preporcess with google/tf2-preview/gnews-swivel-20dim/1', visible=False)],
                 [sg.Text('Neurons', size=(10, 1)), sg.Combo(values=neurons, default_value='128', key='INPUT_NEURONS'),
                  sg.Text('Activation'),
                  sg.Combo(['sigmoid', 'tanh', 'relu'], default_value='sigmoid', key='INPUT_ACTIV', readonly=True)]
@@ -35,8 +37,8 @@ train_layout = \
     ])
       ]]
 
-source_layout = [[sg.Combo(['boston_housing', 'cifar10', 'cifar100', 'mnist', 'fashion_mnist', 'imdb', 'reuters'],
-                           default_value='mnist', key='DATABASE', readonly=True)
+source_layout = [[sg.Combo(['cifar10', 'cifar100', 'mnist', 'fashion_mnist', 'imdb', 'reuters'],
+                           default_value='mnist', key='DATABASE', readonly=True, enable_events=True)
                   ]]
 
 data_layout = \
@@ -82,7 +84,7 @@ hidden_layout_out = [[sg.Text('Neurons', size=(10, 1)), sg.Combo(values=neurons,
                       sg.Text('Activation'),
                       sg.Combo(['sigmoid', 'softmax'], default_value='softmax', key='HID_ACTIV_OUT', readonly=True)]]
 
-config_layout = [[sg.Frame('Input/hidden', layout=input_layout, pad=(0, 4))],
+config_layout = [[sg.Frame('Input/hidden', layout=input_layout, pad=(0, 4), key='CONFIG')],
                  [sg.Frame('Hidden layers', layout=hidden_count, key='HC', pad=(0, 4))],
                  [sg.Frame('Hidden 1', layout=hidden_layout1, key='H1', pad=(0, 4))],
                  [sg.Frame('Hidden 2', layout=hidden_layout2, key='H2', pad=(0, 4), visible=False)],
@@ -200,8 +202,9 @@ def create_nn():
     inn = int(main_window['INPUT_NEURONS'].get())
     iat = main_window['INPUT_ACTIV'].get()
     c2d = bool(main_window['INPUT_CONV2D'].get())
+    db = main_window['DATABASE'].get()
     # input
-    n_n.add_input(inn, iat, iw, ih, c2d)
+    n_n.add_input(inn, iat, iw, ih, c2d, db)
     # hidden's
     for i in range(1, MAX_HIDDEN + 1):
         hc = int(main_window['HID_COUNT'].get())
@@ -227,11 +230,34 @@ def main():
         event, values = main_window.Read(timeout=1000)
         if event in (None, 'Cancel'):
             break
-        # elif event == '__TIMEOUT__':
+        #elif event == '__TIMEOUT__':
             #    print(datetime.datetime.now())
             #if first:
             #    main_window['H2'].update(visible=False)
             #first = False
+        elif event == 'DATABASE':
+            if main_window['DATABASE'].get() in ['mnist', 'fashion_mnist', 'cifar10', 'cifar100']:  # images
+                main_window['INPUT_CONV2D'].update(visible=True)
+                main_window['INPUT_SIZE'].update(visible=True)
+                main_window['INPUT_TEXT_PP'].update(visible=False)
+                af = 'sigmoid'
+                afo = 'softmax'
+            else: # text
+                main_window['INPUT_CONV2D'].update(visible=False)
+                main_window['INPUT_SIZE'].update(visible=False)
+                main_window['INPUT_TEXT_PP'].update(visible=True)
+                af = 'relu'
+                afo = 'sigmoid'
+
+            out = str(md.Data.db_categories(main_window['DATABASE'].get()))
+            main_window['HID_NEURONS_OUT'].update(value=out)
+
+            main_window['INPUT_ACTIV'].update(value=af)
+            for i in range(1, MAX_HIDDEN + 1):
+                main_window['HID_ACTIV' + str(i)].update(values=af)
+            main_window['HID_ACTIV_OUT'].update(value=afo)
+
+            main_window.Refresh()
         elif event == 'HID_COUNT':
             hc = int(main_window['HID_COUNT'].get())
             for i in range(1, MAX_HIDDEN + 1):
@@ -239,6 +265,7 @@ def main():
                     main_window['H' + str(i)].update(visible=True)
                 else:
                     main_window['H' + str(i)].update(visible=False)
+            #need recreate window for resize elements
             main_window.Refresh()
         elif event == 'INPUT_CONV2D':
             if bool(main_window['INPUT_CONV2D'].get()):
@@ -259,8 +286,7 @@ def main():
                 data = create_data()
             nn = create_nn()
         elif event == 'TRAIN_BTN':
-            if data is None:
-                data = create_data()
+            data = create_data()
 
             plot_prepare()
             # clear before each training
@@ -281,6 +307,8 @@ def main():
 
             if nn.conv:
                 nn.fit(data.x_train2d, data.y_train, data.x_test2d, data.y_test, bs, ep, lr, es, do, plot_draw)
+            elif data.is_text:
+                nn.fit(data.x_train, data.y_train, data.x_test, data.y_test, bs, ep, lr, es, do, plot_draw)
             else:
                 nn.fit(data.x_train1d, data.y_train, data.x_test1d, data.y_test, bs, ep, lr, es, do, plot_draw)
 
