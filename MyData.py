@@ -1,5 +1,7 @@
 import keras
 import numpy as np
+from keras_preprocessing.text import Tokenizer
+
 
 class Data:
     def __init__(self, source):
@@ -82,6 +84,7 @@ class Data:
                                                                                   seed=113, start_char=1, oov_char=2,
                                                                                   index_from=3)
             self.word_index = self.db(self.source).get_word_index(path="reuters_word_index.json")
+            self.is_text = True
         else:
             (x_train, y_train), (x_test, y_test) = self.db(self.source).load_data()
 
@@ -91,9 +94,12 @@ class Data:
         # Flatten the images
         train_count = x_train.shape[0]
         test_count = x_test.shape[0]
+        image_size = 0
+        image_vector_size = 0
         if len(x_train.shape) >= 2:
             image_size = x_train.shape[1]
             image_vector_size = image_size * image_size
+
         if len(x_train.shape) == 4:
             channels = x_train.shape[3]
         else:
@@ -112,8 +118,20 @@ class Data:
             self.x_test2d = x_test.reshape(-1, image_size, image_size, channels)
 
             # Convert to "one-hot" vectors using the to_categorical function
-            num_classes = self.db_categories(self.source)
-            self.y_train = keras.utils.to_categorical(y_train, num_classes)
-            self.y_test = keras.utils.to_categorical(y_test, num_classes)
+            self.num_classes = self.db_categories(self.source)
+            self.y_train = keras.utils.to_categorical(y_train, self.num_classes)
+            self.y_test = keras.utils.to_categorical(y_test, self.num_classes)
+        elif self.source == 'reuters':
+            self.num_classes = np.max(y_train) + 1
+            max_words = 10000
+            # Vectorizing sequence data
+            tokenizer = Tokenizer(num_words=max_words)
+            self.x_train = tokenizer.sequences_to_matrix(x_train, mode='binary')
+            self.x_test = tokenizer.sequences_to_matrix(x_test, mode='binary')
+            print('x_train shape:', x_train.shape)
+            print('x_test shape:', x_test.shape)
+            # Convert class vector to binary class matrix
+            self.y_train = keras.utils.to_categorical(y_train, self.num_classes)
+            self.y_test = keras.utils.to_categorical(y_test, self.num_classes)
 
         print("First 5 training labels as one-hot encoded vectors:\n", y_train[:5])
