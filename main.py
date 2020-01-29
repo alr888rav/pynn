@@ -6,11 +6,12 @@ import matplotlib.ticker as ticker
 import matplotlib
 from matplotlib.backends.backend_tkagg import FigureCanvasTkAgg
 from matplotlib.figure import Figure
+import math
 
 matplotlib.use('TkAgg')  # draw inside main_window
 
 MAX_HIDDEN = 5
-neurons = ['1024', '512', '256', '128', '64', '32', '16', '10', '5', '2', '1']
+neurons = ['1024', '512', '256', '128', '64', '46', '32', '16', '10', '5', '2', '1']
 
 i_layout= [[sg.Text('Input size', size=(10, 1)), sg.Input('28', size=(3, 1), key='INPUT_WIDTH', tooltip='width'),
                  sg.Text('X'),
@@ -92,7 +93,8 @@ config_layout = [[sg.Frame('Input/hidden', layout=input_layout, pad=(0, 4), key=
                  [sg.Frame('Hidden 4', layout=hidden_layout4, key='H4', pad=(0, 4), visible=False)],
                  [sg.Frame('Hidden 5', layout=hidden_layout5, key='H5', pad=(0, 4), visible=False)],
                  [sg.Frame('Output', layout=hidden_layout_out, key='HOUT', pad=(0, 4), visible=True)],
-                 [sg.Button('Create', key='CREATE_BTN', size=(35, 1))]
+                 [sg.Button('Create', key='CREATE_BTN', size=(35, 1))],
+                 [sg.Button('Save', key='SAVE_BTN', size=(16,1)), sg.Button('Load', key='LOAD_BTN', size=(17,1))]
                  ]
 col_bottom = []
 main_layout = [
@@ -235,6 +237,55 @@ def main():
             #if first:
             #    main_window['H2'].update(visible=False)
             #first = False
+
+        elif event == 'SAVE_BTN':
+            if nn is not None:
+                text = sg.PopupGetFile('Please enter a file name', save_as=True, no_window=True)
+                nn.save(text)
+
+        elif event == 'LOAD_BTN':
+            text = sg.PopupGetFile('Please enter a file name', save_as=False, no_window=True)
+            nn = create_nn()
+            layers = nn.load(text)
+            # set visual config
+            neurons = layers[0].get('units')
+            activation = layers[0].get('activation')
+            shape = layers[0].get('batch_input_shape')[1]
+            name = str(layers[0].get('name'))
+            main_window['INPUT_WIDTH'].update(value=int(math.sqrt(shape)))
+            main_window['INPUT_HEIGHT'].update(value=int(math.sqrt(shape)))
+            main_window['INPUT_NEURONS'].update(value=str(neurons))
+            main_window['INPUT_ACTIV'].update(value=activation)
+
+            main_window['INPUT_CONV2D'].update(visible=True)
+            main_window['INPUT_TEXT_PP'].update(visible=False)
+            main_window['INPUT_TEXT_PP'].update(value=False)
+            if name[0:5] == 'dense':
+                main_window['INPUT_CONV2D'].update(value=False)
+            else:
+                main_window['INPUT_CONV2D'].update(value=True)
+
+            main_window['HID_COUNT'].update(value=len(layers)-2)
+            hc = int(main_window['HID_COUNT'].get())
+            for i in range(1, MAX_HIDDEN + 1):
+                if i <= hc:
+                    main_window['H' + str(i)].update(visible=True)
+                else:
+                    main_window['H' + str(i)].update(visible=False)
+            main_window.Refresh()
+
+            for i in range(1, len(layers)-1):
+                neurons = layers[i].get('units')
+                activation = layers[i].get('activation')
+                main_window['HID_NEURONS'+str(i)].update(value=str(neurons))
+                main_window['HID_ACTIV'+str(i)].update(value=activation)
+
+            neurons = layers[len(layers)-1].get('units')
+            activation = layers[len(layers)-1].get('activation')
+            main_window['HID_NEURONS_OUT'].update(value=str(neurons))
+            main_window['HID_ACTIV_OUT'].update(value=activation)
+            main_window.Refresh()
+
         elif event == 'DATABASE':
             if main_window['DATABASE'].get() in ['mnist', 'fashion_mnist', 'cifar10', 'cifar100']:  # images
                 main_window['INPUT_CONV2D'].update(visible=True)
@@ -247,17 +298,18 @@ def main():
                 main_window['INPUT_SIZE'].update(visible=False)
                 main_window['INPUT_TEXT_PP'].update(visible=True)
                 af = 'relu'
-                afo = 'sigmoid'
+                afo = 'softmax'
 
             out = str(md.Data.db_categories(main_window['DATABASE'].get()))
             main_window['HID_NEURONS_OUT'].update(value=out)
 
             main_window['INPUT_ACTIV'].update(value=af)
             for i in range(1, MAX_HIDDEN + 1):
-                main_window['HID_ACTIV' + str(i)].update(values=af)
+                main_window['HID_ACTIV' + str(i)].update(value=af)
             main_window['HID_ACTIV_OUT'].update(value=afo)
 
             main_window.Refresh()
+
         elif event == 'HID_COUNT':
             hc = int(main_window['HID_COUNT'].get())
             for i in range(1, MAX_HIDDEN + 1):
