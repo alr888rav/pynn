@@ -19,7 +19,7 @@ class Neural_net:
         self.database = database
         if conv2d:
             self.conv = True
-            # 32 convolution filters used each of size 3x3
+            # 64 convolution filters used each of size 3x3
             self.model.add(Conv2D(64, kernel_size=(3, 3), activation=activation_type, input_shape=(input_height, input_width, 1)))
             # choose the best features via pooling
             self.model.add(MaxPooling2D(pool_size=(2, 2)))
@@ -58,6 +58,18 @@ class Neural_net:
         self.history = self.model.fit(x_train, y_train, batch_size=batch, epochs=epoch, verbose=False, validation_split=.1, callbacks=cb)
         self.loss, self.accuracy = self.model.evaluate(x_test, y_test, verbose=False)
         print(f'Test accuracy: {self.accuracy:.3}')
+
+    def save(self, text):
+        self.model.save(text)
+
+    def load(self, text):
+        self.model = keras.models.load_model(text)
+        res = []
+        for layer in self.model.layers:
+            config = layer.get_config()
+            res.append(config)
+        return res
+
 
 class LossAndErrorPrintingCallback(keras.callbacks.Callback):
 
